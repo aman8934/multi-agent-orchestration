@@ -19,6 +19,8 @@ python-dotenv>=1.0.0
 
 # Async support (important for agents/tools)
 aiohttp>=3.9.0
+fastapi
+uvicorn
 
 # Data handling (optional but useful in pipelines)
 pandas>=2.0.0
