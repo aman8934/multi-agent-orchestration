@@ -207,7 +207,8 @@ uvicorn
 
 ## 🙋 Author
 
-Built by **[Your Name]** — feel free to connect on [LinkedIn](https://linkedin.com/in/your-profile) or [GitHub](https://github.com/your-username).
+Built by Aman Jayswal — feel free to connect on [LinkedIn](https://www.linkedin.com/in/aman-jayswal-a74276281/​)
+
 
 ---
 
