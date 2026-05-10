@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ResearchMind · Multi-Agent Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07070e;
+  --surface:#0e0e1a;
+  --card:#12121f;
+  --border:#1c1c2e;
+  --text:#eeeef5;
+  --muted:#55556a;
+  --faint:#2a2a40;
+  --accent:#c8fb4a;
+  --accent-dim:rgba(200,251,74,.08);
+  --radius:16px;
+  --mono:'DM Mono',monospace;
+  --sans:'Syne',sans-serif;
+  --serif:'Instrument Serif',serif;
+  --sc:#38d9f5;
+  --rc:#c8fb4a;
+  --wc:#a78bfa;
+  --cc:#fb7185;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+.blob{position:fixed;border-radius:50%;filter:blur(130px);opacity:.09;pointer-events:none;animation:drift 20s ease-in-out infinite alternate}
+.b1{width:640px;height:640px;background:#6d28d9;top:-180px;left:-120px;animation-delay:0s}
+.b2{width:520px;height:520px;background:#c8fb4a;bottom:-160px;right:-80px;animation-delay:-7s}
+.b3{width:380px;height:380px;background:#fb7185;top:42%;left:38%;animation-delay:-13s}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(44px,32px) scale(1.1)}}
+
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.025;pointer-events:none;z-index:900}
+
+.wrap{max-width:820px;margin:0 auto;padding:0 20px 100px;position:relative;z-index:1}
+
+/* header */
+header{padding:60px 0 44px;text-align:center}
+.chip{display:inline-flex;align-items:center;gap:8px;background:#141424;border:1px solid var(--border);border-radius:100px;padding:5px 16px 5px 10px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.09em;margin-bottom:26px}
+.chip-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.8)}}
+h1{font-size:clamp(2.4rem,6vw,4.8rem);font-weight:800;line-height:1.06;letter-spacing:-.03em}
+h1 em{font-family:var(--serif);font-style:italic;color:var(--accent);font-weight:400}
+.sub{margin-top:14px;color:var(--muted);font-size:.95rem}
+
+/* search */
+.sbar-wrap{margin:36px auto 0;max-width:640px}
+.sbar{display:flex;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:100px;padding:5px 5px 5px 22px;transition:border-color .2s,box-shadow .2s}
+.sbar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+#topic{flex:1;background:none;border:none;outline:none;font-family:var(--sans);font-size:1rem;color:var(--text);padding:10px 0}
+#topic::placeholder{color:var(--muted)}
+#runBtn{display:flex;align-items:center;gap:7px;background:var(--accent);color:#07070e;border:none;border-radius:100px;padding:11px 24px;font-family:var(--sans);font-weight:700;font-size:.88rem;cursor:pointer;white-space:nowrap;transition:background .15s,transform .1s,opacity .2s}
+#runBtn:hover:not(:disabled){background:#d6ff5e;transform:scale(1.02)}
+#runBtn:active:not(:disabled){transform:scale(.98)}
+#runBtn:disabled{opacity:.45;cursor:not-allowed}
+
+/* pipeline */
+#pipeline{margin-top:56px;display:none}
+#pipeline.on{display:block}
+
+/* progress strip */
+.pstrip{margin-bottom:32px}
+.plabel{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.ptrack{height:2px;background:var(--border);border-radius:100px;overflow:hidden}
+.pfill{height:100%;background:linear-gradient(90deg,var(--sc),var(--accent));border-radius:100px;width:0%;transition:width .7s cubic-bezier(.4,0,.2,1)}
+
+/* timeline */
+.timeline{display:flex;flex-direction:column}
+
+/* agent row */
+.arow{display:flex;gap:0;align-items:stretch}
+
+/* spine */
+.spine{display:flex;flex-direction:column;align-items:center;width:52px;flex-shrink:0}
+.spine-node{
+  width:42px;height:42px;border-radius:50%;
+  border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;
+  background:var(--card);
+  flex-shrink:0;
+  transition:border-color .4s,box-shadow .4s,background .4s;
+  position:relative;z-index:2;
+  margin-top:22px;
+}
+.spine-line{flex:1;width:2px;background:var(--border);transition:background .6s}
+.arow:last-child .spine-line{display:none}
+
+.arow[data-a="search"]{--ac:var(--sc)}
+.arow[data-a="reader"]{--ac:var(--rc)}
+.arow[data-a="writer"]{--ac:var(--wc)}
+.arow[data-a="critic"]{--ac:var(--cc)}
+
+.arow.idle    .spine-node{border-color:var(--border)}
+.arow.running .spine-node{border-color:var(--ac);box-shadow:0 0 0 4px color-mix(in srgb,var(--ac) 18%,transparent);background:color-mix(in srgb,var(--ac) 10%,var(--card))}
+.arow.done    .spine-node{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 15%,var(--card))}
+.arow.error   .spine-node{border-color:var(--cc)}
+.arow.done    .spine-line{background:color-mix(in srgb,var(--ac) 50%,var(--border))}
+
+/* spinning ring */
+.arow.running .spine-node::before{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid transparent;border-top-color:var(--ac);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* done tick */
+.spine-tick{position:absolute;inset:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;background:color-mix(in srgb,var(--ac) 20%,var(--card));color:var(--ac);opacity:0;transition:opacity .3s}
+.arow.done .spine-tick{opacity:1}
+.arow.done .spine-icon{opacity:0}
+
+/* card */
+.acard{flex:1;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);margin:14px 0 14px 16px;overflow:hidden;transition:border-color .4s,box-shadow .4s}
+.arow.running .acard{border-color:var(--ac);box-shadow:0 0 0 1px color-mix(in srgb,var(--ac) 20%,transparent)}
+.arow.done    .acard{border-color:color-mix(in srgb,var(--ac) 40%,var(--border))}
+.arow.error   .acard{border-color:var(--cc)}
+
+/* shimmer on running */
+.arow.running .acard{position:relative;overflow:hidden}
+.arow.running .acard::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,color-mix(in srgb,var(--ac) 5%,transparent) 50%,transparent 100%);animation:shim 2s linear infinite}
+@keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+.acard-top{display:flex;align-items:center;justify-content:space-between;padding:13px 18px 11px;border-bottom:1px solid var(--border);gap:10px}
+.acard-label{font-weight:700;font-size:.92rem;letter-spacing:-.01em}
+.acard-role{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.09em;margin-top:2px}
+.abadge{font-family:var(--mono);font-size:9px;letter-spacing:.07em;padding:3px 10px;border-radius:100px;background:var(--border);color:var(--muted);transition:background .3s,color .3s}
+.arow.running .abadge{background:color-mix(in srgb,var(--ac) 18%,transparent);color:var(--ac)}
+.arow.done    .abadge{background:color-mix(in srgb,var(--ac) 15%,transparent);color:var(--ac)}
+.arow.error   .abadge{background:rgba(251,113,133,.12);color:var(--cc)}
+.atimer{font-family:var(--mono);font-size:10px;color:var(--muted);min-width:38px;text-align:right}
+
+.acard-body{padding:16px 18px 18px;min-height:88px}
+.idle-msg{color:var(--muted);font-size:.8rem;font-family:var(--mono)}
+
+/* skeleton */
+.skel-wrap{display:flex;flex-direction:column;gap:9px}
+.sk{height:8px;border-radius:4px;background:var(--faint);animation:skp 1.3s ease-in-out infinite}
+.sk:nth-child(1){width:88%;animation-delay:0s}
+.sk:nth-child(2){width:70%;animation-delay:.12s}
+.sk:nth-child(3){width:79%;animation-delay:.22s}
+.sk:nth-child(4){width:55%;animation-delay:.32s}
+@keyframes skp{0%,100%{opacity:.3}50%{opacity:.8}}
+
+/* typewriter */
+.stream-text{font-family:var(--mono);font-size:.78rem;line-height:1.7;color:#9898b0;white-space:pre-wrap;word-break:break-word}
+.cursor{display:inline-block;width:2px;height:.85em;background:var(--ac,var(--accent));vertical-align:-.1em;animation:cur .7s step-end infinite;margin-left:1px}
+@keyframes cur{0%,100%{opacity:1}50%{opacity:0}}
+
+/* result */
+.result-text{font-family:var(--mono);font-size:.78rem;line-height:1.75;color:#8f8fa8;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.result-text.open{-webkit-line-clamp:unset}
+.expand-btn{margin-top:8px;background:none;border:none;padding:0;cursor:pointer;font-family:var(--mono);font-size:9px;letter-spacing:.07em;color:var(--ac,var(--accent));opacity:.7}
+.expand-btn:hover{opacity:1}
+
+/* pass label between rows */
+.pass-label{display:flex;align-items:center;gap:8px;padding:0 0 0 68px;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.07em;max-height:0;overflow:hidden;opacity:0;transition:max-height .5s ease,opacity .4s ease}
+.pass-label.show{max-height:24px;opacity:1}
+.pl-line{flex:none;width:28px;height:1px;background:var(--border)}
+
+/* ── output ───────────────────────────────────────── */
+#output{margin-top:48px;display:none;animation:fadeUp .5s ease}
+#output.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+
+.out-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.out-eyebrow::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.out-box{background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.out-tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto}
+.otab{padding:11px 20px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .2s,border-color .2s}
+.otab.active{color:var(--text);border-bottom-color:var(--accent)}
+.opanel{padding:24px 26px;display:none}
+.opanel.active{display:block}
+.ocontent{font-family:var(--mono);font-size:.78rem;line-height:1.85;color:#9090ac;white-space:pre-wrap;word-break:break-word}
+
+.copy-row{display:flex;justify-content:flex-end;margin-bottom:12px}
+.cbtn{background:#191928;border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-family:var(--mono);font-size:9px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px;letter-spacing:.06em;transition:color .15s,border-color .15s}
+.cbtn:hover{color:var(--text);border-color:var(--accent)}
+
+/* toast */
+#toast{position:fixed;bottom:24px;right:24px;background:#1a1a2a;border:1px solid var(--border);border-radius:12px;padding:12px 18px;font-family:var(--mono);font-size:11px;color:var(--text);display:flex;align-items:center;gap:8px;transform:translateY(70px);opacity:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;z-index:999}
+#toast.on{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div class="b1 blob"></div>
+<div class="b2 blob"></div>
+<div class="b3 blob"></div>
+
+<div class="wrap">
+
+  <header>
+    <div class="chip"><span class="chip-dot"></span>MULTI-AGENT · RESEARCH PIPELINE</div>
+    <h1>Think <em>deeper.</em><br>Research smarter.</h1>
+    <p class="sub">Four specialised agents work in sequence — searching, reading, writing &amp; critiquing.</p>
+    <div class="sbar-wrap">
+      <div class="sbar">
+        <input id="topic" type="text" placeholder="Enter a research topic…" autocomplete="off" spellcheck="false"/>
+        <button id="runBtn" onclick="kick()">⚡ Run Pipeline</button>
+      </div>
+    </div>
+  </header>
+
+  <section id="pipeline">
+    <div class="pstrip">
+      <div class="plabel">PIPELINE PROGRESS</div>
+      <div class="ptrack"><div class="pfill" id="pfill"></div></div>
+    </div>
+
+    <div class="timeline">
+
+      <div class="arow idle" data-a="search" id="row-search">
+        <div class="spine">
+          <div class="spine-node">
+            <span class="spine-icon">🔍</span>
+            <span class="spine-tick">✓</span>
+          </div>
+          <div class="spine-line"></div>
+        </div>
+        <div class="acard">
+          <div class="acard-top">
+            <div><div class="acard-label">Search Agent</div><div class="acard-role">WEB · RETRIEVAL</div></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="atimer" id="t-search"></span>
+              <span class="abadge" id="b-search">IDLE</span>
+            </div>
+          </div>
+          <div class="acard-body" id="bd-search"><p class="idle-msg">Waiting to search the web…</p></div>
+        </div>
+      </div>
+
+      <div class="pass-label" id="pl-1"><div class="pl-line"></div>passing search results to reader →</div>
+
+      <div class="arow idle" data-a="reader" id="row-reader">
+        <div class="spine">
+          <div class="spine-node">
+            <span class="spine-icon">📖</span>
+            <span class="spine-tick">✓</span>
+          </div>
+          <div class="spine-line"></div>
+        </div>
+        <div class="acard">
+          <div class="acard-top">
+            <div><div class="acard-label">Reader Agent</div><div class="acard-role">URL · SCRAPER</div></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="atimer" id="t-reader"></span>
+              <span class="abadge" id="b-reader">IDLE</span>
+            </div>
+          </div>
+          <div class="acard-body" id="bd-reader"><p class="idle-msg">Waiting for search results…</p></div>
+        </div>
+      </div>
+
+      <div class="pass-label" id="pl-2"><div class="pl-line"></div>passing scraped content to writer →</div>
+
+      <div class="arow idle" data-a="writer" id="row-writer">
+        <div class="spine">
+          <div class="spine-node">
+            <span class="spine-icon">✍️</span>
+            <span class="spine-tick">✓</span>
+          </div>
+          <div class="spine-line"></div>
+        </div>
+        <div class="acard">
+          <div class="acard-top">
+            <div><div class="acard-label">Writer Agent</div><div class="acard-role">REPORT · DRAFTER</div></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="atimer" id="t-writer"></span>
+              <span class="abadge" id="b-writer">IDLE</span>
+            </div>
+          </div>
+          <div class="acard-body" id="bd-writer"><p class="idle-msg">Waiting to draft the report…</p></div>
+        </div>
+      </div>
+
+      <div class="pass-label" id="pl-3"><div class="pl-line"></div>passing draft to critic →</div>
+
+      <div class="arow idle" data-a="critic" id="row-critic">
+        <div class="spine">
+          <div class="spine-node">
+            <span class="spine-icon">🧐</span>
+            <span class="spine-tick">✓</span>
+          </div>
+          <div class="spine-line"></div>
+        </div>
+        <div class="acard">
+          <div class="acard-top">
+            <div><div class="acard-label">Critic Agent</div><div class="acard-role">QUALITY · REVIEWER</div></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="atimer" id="t-critic"></span>
+              <span class="abadge" id="b-critic">IDLE</span>
+            </div>
+          </div>
+          <div class="acard-body" id="bd-critic"><p class="idle-msg">Waiting to review…</p></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="output">
+    <div class="out-eyebrow">Final output</div>
+    <div class="out-box">
+      <div class="out-tabs">
+        <div class="otab active" onclick="swTab('report',this)">📄 Report</div>
+        <div class="otab" onclick="swTab('feedback',this)">🧐 Critic Feedback</div>
+        <div class="otab" onclick="swTab('raw',this)">📦 Raw Data</div>
+      </div>
+      <div class="opanel active" id="p-report">
+        <div class="copy-row"><button class="cbtn" onclick="cp('oc-report')">⎘ Copy</button></div>
+        <div class="ocontent" id="oc-report"></div>
+      </div>
+      <div class="opanel" id="p-feedback">
+        <div class="copy-row"><button class="cbtn" onclick="cp('oc-feedback')">⎘ Copy</button></div>
+        <div class="ocontent" id="oc-feedback"></div>
+      </div>
+      <div class="opanel" id="p-raw">
+        <div class="copy-row"><button class="cbtn" onclick="cp('oc-raw')">⎘ Copy</button></div>
+        <div class="ocontent" id="oc-raw"></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div id="toast"><span id="t-ico">✓</span><span id="t-msg">Copied!</span></div>
+
+<script>
+const API = 'http://localhost:8000';
+const timers = {};
+let pdata = {};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function prog(p){ $('pfill').style.width = p+'%' }
+
+function rowState(a, s){
+  $('row-'+a).className = 'arow '+s;
+  const lbl = {idle:'IDLE',running:'RUNNING',done:'DONE',error:'ERROR'};
+  $('b-'+a).textContent = lbl[s]||s.toUpperCase();
+}
+
+function setBody(a, html){ $('bd-'+a).innerHTML = html }
+
+function showSkel(a){
+  setBody(a,`<div class="skel-wrap"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>`);
+}
+
+/* typewriter effect */
+function typeInto(a, text){
+  const bodyEl = $('bd-'+a);
+  bodyEl.innerHTML = `<div class="stream-text" id="st-${a}"></div><span class="cursor" id="cur-${a}"></span>`;
+  const el = $('st-'+a);
+  const words = text.split(' ');
+  let i = 0;
+  const iv = setInterval(()=>{
+    if(i >= words.length){ clearInterval(iv); $('cur-'+a).remove(); return; }
+    el.textContent += (i===0?'':' ') + words[i++];
+  }, 20);
+}
+
+function showResult(a, text){
+  const rid='r-'+a, bid='eb-'+a;
+  setBody(a,`<div class="result-text" id="${rid}">${esc(text)}</div><button class="expand-btn" id="${bid}" onclick="exp('${rid}','${bid}')">▼ SHOW MORE</button>`);
+}
+
+function exp(rid, bid){
+  const open = $( rid).classList.toggle('open');
+  $(bid).textContent = open ? '▲ SHOW LESS' : '▼ SHOW MORE';
+}
+
+function startT(a){
+  const t0 = Date.now();
+  timers[a] = setInterval(()=>{
+    $('t-'+a).textContent = ((Date.now()-t0)/1000).toFixed(1)+'s';
+  }, 100);
+}
+function stopT(a){ clearInterval(timers[a]) }
+
+function showPass(n){ setTimeout(()=>$('pl-'+n).classList.add('show'), 400) }
+
+function toast(msg, ico='✓'){
+  $('t-msg').textContent=msg; $('t-ico').textContent=ico;
+  const t=$('toast'); t.classList.add('on');
+  setTimeout(()=>t.classList.remove('on'), 2800);
+}
+
+function swTab(k, el){
+  document.querySelectorAll('.otab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.opanel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active'); $('p-'+k).classList.add('active');
+}
+
+function cp(id){ navigator.clipboard.writeText($(id).textContent).then(()=>toast('Copied!')) }
+
+function reset(){
+  ['search','reader','writer','critic'].forEach(a=>{
+    rowState(a,'idle');
+    $('t-'+a).textContent='';
+    setBody(a,`<p class="idle-msg">Waiting…</p>`);
+  });
+  ['pl-1','pl-2','pl-3'].forEach(id=>$(id).classList.remove('show'));
+  prog(0); pdata={};
+  $('output').classList.remove('on');
+}
+
+async function kick(){
+  const topic = $('topic').value.trim();
+  if(!topic){ toast('Enter a research topic','⚠'); return; }
+  const btn=$('runBtn');
+  btn.disabled=true; btn.textContent='⏳ Running…';
+  reset();
+  $('pipeline').classList.add('on');
+  prog(4);
+  const pm={search:25,reader:50,writer:75,critic:100};
+  try{
+    const res = await fetch(`${API}/research/stream`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({topic})
+    });
+    if(!res.ok){ const e=await res.json().catch(()=>({})); throw new Error(e.detail||`HTTP ${res.status}`); }
+    const reader=res.body.getReader(), dec=new TextDecoder();
+    let buf='';
+    while(true){
+      const {value,done}=await reader.read();
+      if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const parts=buf.split('\n\n'); buf=parts.pop();
+      for(const part of parts){
+        let ev='message', data='';
+        for(const line of part.trim().split('\n')){
+          if(line.startsWith('event: ')) ev=line.slice(7).trim();
+          if(line.startsWith('data: '))  data=line.slice(6).trim();
+        }
+        if(!data) continue;
+        let pl; try{ pl=JSON.parse(data) }catch{ continue }
+        handle(ev,pl,pm);
+      }
+    }
+  }catch(e){
+    toast('Error: '+e.message,'✕');
+  }finally{
+    btn.disabled=false; btn.innerHTML='⚡ Run Pipeline';
+  }
+}
+
+function handle(ev, pl, pm){
+  const {agent, result, error} = pl;
+  if(ev==='agent_start'){
+    rowState(agent,'running');
+    showSkel(agent);
+    startT(agent);
+    prog((pl.step-1)*25+4);
+    /* scroll card into view */
+    setTimeout(()=>$('row-'+agent).scrollIntoView({behavior:'smooth',block:'nearest'}), 200);
+  }
+  else if(ev==='agent_done'){
+    stopT(agent);
+    rowState(agent,'done');
+    const preview = result.slice(0,300)+(result.length>300?'…':'');
+    typeInto(agent, preview);
+    const delay = Math.min(preview.split(' ').length*20+600, 4000);
+    setTimeout(()=>showResult(agent, result), delay);
+    prog(pm[agent]);
+    pdata[agent]=result;
+    const passMap={search:'1',reader:'2',writer:'3'};
+    if(passMap[agent]) showPass(passMap[agent]);
+  }
+  else if(ev==='agent_error'){
+    stopT(agent);
+    rowState(agent,'error');
+    setBody(agent,`<p style="color:var(--cc);font-size:.78rem;font-family:var(--mono)">Error: ${esc(error)}</p>`);
+    toast('Agent error: '+agent,'✕');
+  }
+  else if(ev==='pipeline_done'){
+    prog(100);
+    $('oc-report').textContent   = pl.report||'';
+    $('oc-feedback').textContent = pl.feedback||'';
+    $('oc-raw').textContent      = JSON.stringify({search:pl.search_results,scraped:pl.scraped_content},null,2);
+    $('output').classList.add('on');
+    setTimeout(()=>$('output').scrollIntoView({behavior:'smooth',block:'start'}),400);
+    toast('Pipeline complete! 🎉');
+  }
+}
+
+$('topic').addEventListener('keydown', e=>{ if(e.key==='Enter') kick() });
+</script>
+</body>
+</html>
