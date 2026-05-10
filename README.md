@@ -95,7 +95,7 @@ research-pipeline/
 ### 1. Clone and set up the environment
 
 ```bash
-git clone https://github.com/your-username/research-pipeline.git
+git clone https://github.com/aman8934/multi-agent-orchestration.git
 cd research-pipeline
 
 python -m venv venv
